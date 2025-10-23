@@ -1,66 +1,101 @@
-// index.js - PopChat MVP Logic
+// server.js — PopChat Signaling + Static Server
+// Works locally and on Render
 
-// WebRTC Setup
-const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-let peerConnection = null;
-let dataChannel = null;
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const path = require('path');
 
-function startConnection() {
-  peerConnection = new RTCPeerConnection(configuration);
+const app = express();
 
-  // Handle ICE candidates
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      console.log('ICE candidate', event.candidate);
-      // Send to signaling server (simplified placeholder)
+// ✅ Serve frontend files from /public
+app.use(express.static(path.join(__dirname, 'public')));
+
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+const PORT = process.env.PORT || 3000;
+
+// In-memory waiting queue for random pairing
+let waiting = null;
+
+// Helper: safely send JSON messages
+function send(ws, data) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(data));
+  }
+}
+
+// Handle new WebSocket connections
+wss.on('connection', (ws) => {
+  ws.id = Math.random().toString(36).substring(2, 9);
+  ws.partner = null;
+  console.log(`🟢 Client connected: ${ws.id}`);
+
+  ws.on('message', (raw) => {
+    let msg;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      console.warn('Invalid JSON message received');
+      return;
     }
-  };
 
-  // Handle stream
-  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    .then((stream) => {
-      const localVideo = document.getElementById('localVideo');
-      localVideo.srcObject = stream;
-      stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-    })
-    .catch(err => console.error('Media error:', err));
+    switch (msg.type) {
+      case 'join':
+        console.log(`👥 ${ws.id} wants to join`);
+        // If someone is waiting, pair them
+        if (waiting && waiting !== ws) {
+          ws.partner = waiting;
+          waiting.partner = ws;
 
-  // Data channel for signaling (simplified)
-  dataChannel = peerConnection.createDataChannel('chat');
-  dataChannel.onopen = () => console.log('Channel open');
-  dataChannel.onmessage = (event) => console.log('Message:', event.data);
+          send(ws, { type: 'paired', partner: waiting.id });
+          send(waiting, { type: 'paired', partner: ws.id });
 
-  // Simplified offer (replace with real signaling)
-  peerConnection.createOffer()
-    .then(offer => peerConnection.setLocalDescription(offer))
-    .then(() => console.log('Offer created', peerConnection.localDescription))
-    .catch(err => console.error('Offer error:', err));
-}
+          console.log(`✅ Paired ${ws.id} with ${waiting.id}`);
+          waiting = null;
+        } else {
+          // Otherwise, mark this user as waiting
+          waiting = ws;
+          send(ws, { type: 'waiting' });
+          console.log(`⌛ ${ws.id} is waiting for a partner...`);
+        }
+        break;
 
-function startNewConnection() {
-  if (peerConnection) {
-    peerConnection.close(); // End current connection
-  }
-  startConnection(); // Start a new one
-}
+      case 'offer':
+      case 'answer':
+      case 'ice':
+        if (ws.partner && ws.partner.readyState === WebSocket.OPEN) {
+          send(ws.partner, msg);
+        }
+        break;
 
-// Button Handlers
-document.getElementById('popNow').addEventListener('click', startConnection);
-document.getElementById('nextButton').addEventListener('click', () => {
-  console.log('Next clicked');
-  if (peerConnection) {
-    peerConnection.close();
-    startNewConnection();
-  }
+      case 'leave':
+        if (ws.partner) {
+          send(ws.partner, { type: 'leave' });
+          ws.partner.partner = null;
+          ws.partner = null;
+        }
+        if (waiting === ws) waiting = null;
+        break;
+
+      default:
+        console.warn('⚠️ Unknown message type:', msg.type);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log(`🔴 Client disconnected: ${ws.id}`);
+    if (ws.partner) {
+      send(ws.partner, { type: 'leave' });
+      ws.partner.partner = null;
+    }
+    if (waiting === ws) waiting = null;
+  });
 });
 
-// Ensure UI loads (fallback)
-window.onload = () => {
-  if (!document.getElementById('nextButton')) {
-    document.body.innerHTML += `
-      <video id="localVideo" autoplay playsinline></video>
-      <button id="popNow">Pop Now</button>
-      <button id="nextButton">Next</button>
-    `;
-  }
-};
+// ✅ Start server (Render automatically injects PORT)
+server.listen(PORT, () => {
+  console.log(`🚀 PopChat signaling server running on port ${PORT}`);
+});
+
