@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PopChat - Instant Random Video Chat</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      display: flex;
+      height: 100vh;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    #popButton {
+      background-color: #1db954;
+      border: none;
+      padding: 20px 40px;
+      font-size: 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #popButton:hover {
+      background-color: #1ed760;
+    }
+  </style>
+</head>
+<body>
+  <button id="popButton">Pop Now</button>
+
+  <script>
+    const popButton = document.getElementById('popButton');
+
+    popButton.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        alert('Access granted to camera and microphone. Ready to connect!');
+        // Here add further steps: initiate WebRTC connection, etc.
+      } catch (error) {
+        alert('Camera and microphone access denied. Please allow to continue.');
+      }
+    });
+  </script>
+</body>
+</html>
