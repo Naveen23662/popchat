@@ -1,6 +1,6 @@
 // public/index.js — PopChat client (uses initiator flag so only one side creates offer)
 
-let SIGNALING_URL = 'wss://<RENDER_DOMAIN>';
+let SIGNALING_URL = 'wss://popchat-1.onrender.com';
 if (SIGNALING_URL.includes('<RENDER_DOMAIN>')) {
   if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     SIGNALING_URL = 'ws://localhost:3000';
