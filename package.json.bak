@@ -9,11 +9,12 @@
   "dependencies": {
     "express": "^4.21.2",
     "ws": "^8.18.3"
-  },
+  }
+}
   "devDependencies": {
     "vite": "^7.1.12"
   },
-  "author": "Naveen",
+  "keywords": [],
+  "author": "",
   "license": "ISC"
 }
-

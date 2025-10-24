@@ -1,61 +1,50 @@
-// server.js — PopChat Signaling + Static Server
-// Works locally and on Render
-
+// server.js — PopChat signaling server + static serving (paired role assignment)
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 
 const app = express();
-
-// ✅ Serve frontend files from /public
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-
-// In-memory waiting queue for random pairing
 let waiting = null;
 
-// Helper: safely send JSON messages
 function send(ws, data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
   }
 }
 
-// Handle new WebSocket connections
 wss.on('connection', (ws) => {
   ws.id = Math.random().toString(36).substring(2, 9);
   ws.partner = null;
-  console.log(`🟢 Client connected: ${ws.id}`);
+  console.log('🟢 Client connected:', ws.id);
 
   ws.on('message', (raw) => {
     let msg;
-    try {
-      msg = JSON.parse(raw);
-    } catch {
-      console.warn('Invalid JSON message received');
-      return;
-    }
+    try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
       case 'join':
-        console.log(`👥 ${ws.id} wants to join`);
-        // If someone is waiting, pair them
+        console.log(`👥 ${ws.id} join`);
+        // If someone is waiting, pair them and assign roles:
         if (waiting && waiting !== ws) {
+          // waiting is the older client — make the NEW client the initiator (creates offer)
           ws.partner = waiting;
           waiting.partner = ws;
 
-          send(ws, { type: 'paired', partner: waiting.id });
-          send(waiting, { type: 'paired', partner: ws.id });
+          // send paired info with initiator flag
+          send(ws, { type: 'paired', initiator: true, partner: waiting.id });
+          send(waiting, { type: 'paired', initiator: false, partner: ws.id });
 
-          console.log(`✅ Paired ${ws.id} with ${waiting.id}`);
+          console.log(`✅ Paired ${ws.id} (initiator) <-> ${waiting.id} (answerer)`);
           waiting = null;
         } else {
-          // Otherwise, mark this user as waiting
+          // no one waiting, mark this ws as waiting
           waiting = ws;
           send(ws, { type: 'waiting' });
           console.log(`⌛ ${ws.id} is waiting for a partner...`);
@@ -80,21 +69,22 @@ wss.on('connection', (ws) => {
         break;
 
       default:
-        console.warn('⚠️ Unknown message type:', msg.type);
+        console.warn('Unknown message type:', msg.type);
     }
   });
 
   ws.on('close', () => {
-    console.log(`🔴 Client disconnected: ${ws.id}`);
+    console.log('🔴 Client disconnected:', ws.id);
     if (ws.partner) {
       send(ws.partner, { type: 'leave' });
       ws.partner.partner = null;
     }
     if (waiting === ws) waiting = null;
   });
+
+  ws.on('error', (e) => console.warn('WS error', e));
 });
 
-// ✅ Start server (Render automatically injects PORT)
 server.listen(PORT, () => {
   console.log(`🚀 PopChat signaling server running on port ${PORT}`);
 });
