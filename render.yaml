@@ -1,0 +1,12 @@
+# render.yaml — PopChat Web Service (Node)
+services:
+  - type: web
+    name: popchat-backend
+    env: node
+    plan: free
+    branch: main
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    autoDeploy: true
+    region: oregon
+
