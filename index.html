@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PopChat Clean</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>PopChat is Live 🚀</h2>
+  <form id="form">
+    <input id="msg" placeholder="Type message..." />
+    <button>Send</button>
+  </form>
+  <div id="chat"></div>
+
+  <script>
+    const socket = io();
+    const form = document.getElementById("form");
+    const msg = document.getElementById("msg");
+    const chat = document.getElementById("chat");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      socket.emit("message", msg.value);
+      chat.innerHTML += `<div>Me: ${msg.value}</div>`;
+      msg.value = "";
+    });
+
+    socket.on("message", (data) => {
+      chat.innerHTML += `<div>Peer: ${data}</div>`;
+    });
+  </script>
+</body>
+</html>
+
