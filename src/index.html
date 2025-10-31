@@ -1,1 +1,31 @@
-<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>PopChat</title><script src="/socket.io/socket.io.js"></script></head><body><h2>PopChat is Live 🚀</h2><form id="form"><input id="msg" placeholder="Type message..."/><button>Send</button></form><div id="chat"></div><script>const socket=io();const f=document.getElementById('form'),m=document.getElementById('msg'),c=document.getElementById('chat');f.addEventListener('submit',e=>{e.preventDefault();socket.emit('message',m.value);c.innerHTML+=`<div>Me: ${m.value}</div>`;m.value='';});socket.on('message',d=>c.innerHTML+=`<div>Peer: ${d}</div>`);</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PopChat</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>PopChat is Live 🚀</h2>
+  <form id="form">
+    <input id="msg" placeholder="Type message..." />
+    <button>Send</button>
+  </form>
+  <div id="chat"></div>
+
+  <script>
+    const socket = io();
+    const f = document.getElementById("form");
+    const m = document.getElementById("msg");
+    const c = document.getElementById("chat");
+    f.addEventListener("submit", e => {
+      e.preventDefault();
+      socket.emit("message", m.value);
+      c.innerHTML += `<div>Me: ${m.value}</div>`;
+      m.value = "";
+    });
+    socket.on("message", d => c.innerHTML += `<div>Peer: ${d}</div>`);
+  </script>
+</body>
+</html>
