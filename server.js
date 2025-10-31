@@ -1,6 +1,3 @@
-cd ~/Downloads/popchat
-# use bash if zsh errors: run `bash` then paste
-cat > server.js <<'NODE'
 const express = require('express');
 const http = require('http');
 const path = require('path');
