@@ -1,153 +1,128 @@
-// client.js - live camera preview + chat wiring (minimal)
+// client.js — dark UI behavior: local preview + simple chat messages + Next/PopNow controls
 let localStream = null;
-let currentVideoDeviceId = null;
 let videoDevices = [];
+let currentDeviceId = null;
+const localPreview = document.getElementById('localPreview');
+const camState = document.getElementById('camState');
+const miniPreview = document.getElementById('miniPreview');
 
-// DOM elements
-const previewVideo = document.getElementById('previewVideo');
-const videoOverlay = document.getElementById('videoOverlay');
-const startBtn = document.getElementById('startVideo');
-const stopBtn = document.getElementById('stopVideo');
-const flipBtn = document.getElementById('flipCamera');
-const statusInfo = document.getElementById('statusInfo');
-const userCountEl = document.getElementById('userCount');
-const chatArea = document.getElementById('chatArea');
+const nextBtn = document.getElementById('nextBtn');
+const popNowBtn = document.getElementById('popNowBtn');
+const filtersBtn = document.getElementById('filtersBtn');
+const muteBtn = document.getElementById('muteBtn');
+
+const chatBox = document.getElementById('chatBox');
 const msgInput = document.getElementById('msgInput');
 const sendBtn = document.getElementById('sendBtn');
 
-function setStatus(text, isError = false) {
-  if (!statusInfo) return;
-  statusInfo.textContent = text;
-  statusInfo.style.color = isError ? '#b91c1c' : '#0b6cff';
+function appendLocalMessage(text, who = 'Me') {
+  const el = document.createElement('div');
+  el.style.margin = '10px 0';
+  el.style.textAlign = 'right';
+  el.innerHTML = `<span style="display:inline-block; background:linear-gradient(90deg,#09202a,#0b2b3c); padding:8px 12px; border-radius:12px; color:#dbeeff; max-width:80%;">${who}: ${escapeHtml(text)}</span>`;
+  chatBox.appendChild(el);
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// enumerate cameras (called once)
-async function enumerateCameras() {
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+sendBtn.addEventListener('click', () => {
+  const t = msgInput.value && msgInput.value.trim();
+  if (!t) return;
+  appendLocalMessage(t);
+  msgInput.value = '';
+  // TODO: emit to socket
+});
+
+// enumerate devices to enable flip if needed
+async function enumerate() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     videoDevices = devices.filter(d => d.kind === 'videoinput');
-    // default to first if none selected
-    if (videoDevices.length && !currentVideoDeviceId) {
-      currentVideoDeviceId = videoDevices[0].deviceId;
-    }
-    flipBtn.disabled = videoDevices.length <= 1;
-  } catch (err) {
-    console.warn('enumerateDevices error', err);
+    if (videoDevices.length && !currentDeviceId) currentDeviceId = videoDevices[0].deviceId;
+  } catch (e) {
+    console.warn('enumerate error', e);
   }
 }
 
-// start camera with optional specific deviceId
-async function startCamera(deviceId = null) {
+// start local preview
+async function startLocal(deviceId = null) {
   try {
-    // stop existing
-    stopCamera();
-
+    stopLocal();
     const constraints = {
       audio: true,
-      video: deviceId ? { deviceId: { exact: deviceId } } : { width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } : { facingMode: 'user', width:{ ideal:1280 }, height:{ ideal:720 } }
     };
     localStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-    // attach to video element
-    previewVideo.srcObject = localStream;
-    previewVideo.style.display = 'block';
-    videoOverlay.style.display = 'none';
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    flipBtn.disabled = videoDevices.length <= 1;
-
-    setStatus('Video running');
-
-    // remember deviceId if available
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack && videoTrack.getSettings) {
-      const settings = videoTrack.getSettings();
-      if (settings.deviceId) currentVideoDeviceId = settings.deviceId;
-    }
+    localPreview.srcObject = localStream;
+    camState.textContent = 'On';
+    // auto mirror for front cameras if available
+    try {
+      const settings = localStream.getVideoTracks()[0].getSettings();
+      if (settings && settings.facingMode && settings.facingMode === 'user') {
+        localPreview.style.transform = 'scaleX(-1)';
+      } else {
+        localPreview.style.transform = '';
+      }
+      if (settings && settings.deviceId) currentDeviceId = settings.deviceId;
+    } catch(e){}
   } catch (err) {
-    console.error('getUserMedia error', err);
-    const msg = err && err.name ? `${err.name}: ${err.message}` : 'Camera/mic error';
-    setStatus(msg, true);
-    previewVideo.style.display = 'none';
-    videoOverlay.style.display = 'flex';
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    console.error('camera error', err);
+    camState.textContent = 'Error';
   }
 }
 
-// stop and clean up stream
-function stopCamera() {
+function stopLocal(){
   if (!localStream) return;
-  localStream.getTracks().forEach(t => {
-    try { t.stop(); } catch (e) {}
-  });
+  localStream.getTracks().forEach(t => { try{ t.stop(); }catch(e){} });
   localStream = null;
-  previewVideo.srcObject = null;
-  previewVideo.style.display = 'none';
-  videoOverlay.style.display = 'flex';
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-  setStatus('Video stopped');
+  localPreview.srcObject = null;
+  camState.textContent = 'Off';
+  localPreview.style.transform = '';
 }
 
-// flip camera (if multiple)
-async function flipCamera() {
+// flip camera: cycle devices
+async function flipCamera(){
   if (!videoDevices || videoDevices.length <= 1) return;
-  // find index of current device
-  const idx = videoDevices.findIndex(d => d.deviceId === currentVideoDeviceId);
+  const idx = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
   const next = videoDevices[(idx + 1) % videoDevices.length];
-  if (next) {
-    await startCamera(next.deviceId);
+  if (next) await startLocal(next.deviceId);
+}
+
+// wiring buttons
+popNowBtn.addEventListener('click', () => {
+  // For demo: append a message that pop happened
+  appendLocalMessage('Pop Now pressed', 'System');
+});
+
+nextBtn.addEventListener('click', () => {
+  appendLocalMessage('Next pressed', 'System');
+});
+
+// filters/mute demo behaviours
+filtersBtn.addEventListener('click', () => {
+  appendLocalMessage('Filters toggled (demo)', 'System');
+});
+let muted = false;
+muteBtn.addEventListener('click', () => {
+  if (!localStream) {
+    appendLocalMessage('No local stream', 'System');
+    return;
   }
-}
-
-// basic chat send (local-only demo)
-function appendMessage(text, who = 'Me') {
-  const wrap = document.createElement('div');
-  wrap.style.display = 'flex';
-  wrap.style.justifyContent = 'flex-end';
-  wrap.style.margin = '8px 0';
-
-  const bubble = document.createElement('div');
-  bubble.textContent = `${who}: ${text}`;
-  bubble.style.background = '#e6f0ff';
-  bubble.style.padding = '8px 12px';
-  bubble.style.borderRadius = '12px';
-  bubble.style.maxWidth = '60%';
-  bubble.style.fontSize = '13px';
-
-  wrap.appendChild(bubble);
-  chatArea.appendChild(wrap);
-  chatArea.scrollTop = chatArea.scrollHeight;
-}
-
-sendBtn && sendBtn.addEventListener('click', () => {
-  const text = msgInput.value && msgInput.value.trim();
-  if (!text) return;
-  appendMessage(text, 'Me');
-  msgInput.value = '';
-  // TODO: here you'd emit message over socket
+  muted = !muted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !muted);
+  muteBtn.textContent = muted ? 'Unmute' : 'Mute';
+  appendLocalMessage(muted ? 'Muted mic' : 'Unmuted mic', 'System');
 });
 
-// wire video controls
-startBtn && startBtn.addEventListener('click', async () => {
-  setStatus('Requesting camera...');
-  await enumerateCameras();
-  await startCamera(currentVideoDeviceId);
-});
-
-stopBtn && stopBtn.addEventListener('click', () => stopCamera());
-flipBtn && flipBtn.addEventListener('click', () => flipCamera());
-
-// auto-enumerate devices early (helps flip button)
-if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-  enumerateCameras().catch(console.warn);
-} else {
-  setStatus('Media devices API not available', true);
-}
-
-// small helpful hint: remove video on page unload
-window.addEventListener('beforeunload', () => {
-  try { stopCamera(); } catch (e) {}
-});
+// autorun: enumerate and start local preview by default (so UI matches your screenshot)
+(async function init(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    appendLocalMessage('Media devices API not available', 'System');
+    return;
+  }
+  await enumerate();
+  // start preview automatically (you can remove this if you want Start button instead)
+  await startLocal(currentDeviceId);
+})();
 
