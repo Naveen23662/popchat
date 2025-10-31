@@ -1,3 +1,77 @@
-<!-- Replace with the responsive file header lines you used earlier (title: PopChat — Responsive) -->
 <!doctype html>
-<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>PopChat — Responsive</title></head><body>REDEPLOY_MARKER</body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PopChat — Responsive</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body{font-family:Inter,system-ui,Arial;margin:0;background:linear-gradient(180deg,#f7fbff,#fff);color:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+    .wrap{width:100%;max-width:980px;background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(10,20,40,0.06);display:flex;gap:20px;overflow:hidden}
+    .left{flex:1;padding:20px;display:flex;flex-direction:column}
+    h1{margin:0 0 6px;font-size:24px}
+    .sub{color:#666;margin-bottom:12px}
+    #chat{flex:1;background:#fbfdff;border-radius:10px;padding:10px;overflow:auto;min-height:300px;display:flex;flex-direction:column;gap:8px;border:1px solid rgba(10,20,40,0.03)}
+    form{display:flex;gap:8px;margin-top:12px}
+    input{flex:1;padding:12px 14px;border-radius:10px;border:1px solid rgba(20,30,50,0.08);font-size:16px}
+    button{background:#0b67ff;color:#fff;border:0;padding:12px 18px;border-radius:10px;cursor:pointer;font-weight:600}
+    .msg{padding:10px 14px;border-radius:12px;max-width:75%;word-break:break-word}
+    .me{align-self:flex-end;background:#e7f0ff;color:#04256a}
+    .peer{align-self:flex-start;background:#f2f4f7;color:#111}
+    .right{width:320px;background:#fff;padding:18px;border-left:1px solid rgba(10,20,40,0.03);display:flex;flex-direction:column;gap:12px}
+    .video-placeholder{height:220px;border-radius:8px;background:linear-gradient(90deg,#0b67ff14,#d9e6ff);display:flex;align-items:center;justify-content:center;color:#0b67ff;font-weight:700;border:1px dashed rgba(11,103,255,0.08)}
+    .meta{color:#666;font-size:14px}
+    @media(max-width:900px){.wrap{flex-direction:column}.right{width:100%;order:2}.left{order:1}}
+    @media(max-width:420px){h1{font-size:20px}input,button{font-size:15px;padding:11px}}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="application" aria-label="PopChat">
+    <div class="left">
+      <div>
+        <h1>PopChat is Live 🚀</h1>
+        <div class="sub">Responsive chat — works on laptop & mobile</div>
+      </div>
+      <div id="chat" aria-live="polite"></div>
+      <form id="form" autocomplete="off">
+        <input id="msg" placeholder="Type message..." required />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+
+    <div class="right" aria-hidden="false">
+      <div class="video-placeholder">Video / Media (placeholder)</div>
+      <div class="meta"><strong>Status:</strong> Connected</div>
+      <div class="meta"><strong>Users:</strong> <span id="userCount">1</span></div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const chat = document.getElementById('chat');
+    const userCount = document.getElementById('userCount');
+
+    function appendMsg(text, cls){
+      const d = document.createElement('div');
+      d.className = 'msg ' + cls;
+      d.textContent = text;
+      chat.appendChild(d);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if(!msg.value.trim()) return;
+      socket.emit('message', msg.value);
+      appendMsg('Me: ' + msg.value, 'me');
+      msg.value = '';
+      msg.focus();
+    });
+
+    socket.on('message', (m) => appendMsg('Peer: ' + m, 'peer'));
+    socket.on('user-count', (n) => userCount.textContent = String(n));
+  </script>
+</body>
+</html>
