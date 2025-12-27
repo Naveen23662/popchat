@@ -11,9 +11,12 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+// Serve static files
 app.use(express.static(__dirname));
 
-// ---- WebSocket logic ----
+// --------------------
+// WebSocket logic
+// --------------------
 let waitingUser = null;
 
 wss.on("connection", (ws) => {
@@ -52,7 +55,10 @@ wss.on("connection", (ws) => {
     // Next
     if (msg.type === "next") {
       if (ws.partner) {
-        ws.partner.send(JSON.stringify({ type: "status", message: "Stranger disconnected" }));
+        ws.partner.send(JSON.stringify({
+          type: "status",
+          message: "Stranger disconnected"
+        }));
         ws.partner.partner = null;
         waitingUser = ws.partner;
       }
@@ -64,19 +70,26 @@ wss.on("connection", (ws) => {
     if (ws === waitingUser) {
       waitingUser = null;
     }
+
     if (ws.partner) {
-      ws.partner.send(JSON.stringify({ type: "status", message: "Stranger left" }));
+      ws.partner.send(JSON.stringify({
+        type: "status",
+        message: "Stranger left"
+      }));
       ws.partner.partner = null;
       waitingUser = ws.partner;
     }
   });
 });
 
-// ---- Serve app ----
-app.get("*", (_, res) => {
+// --------------------
+// Catch-all (FIXED)
+// --------------------
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+// --------------------
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log("PopChat running on port", PORT);
