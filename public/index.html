@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let stream = null;
   let socket = null;
   let pc = null;
+  let isCaller = false;
 
   // ---------------- ELEMENTS ----------------
   const localVideo = document.getElementById("localVideo");
@@ -28,17 +29,25 @@ document.addEventListener("DOMContentLoaded", () => {
     socket.onmessage = async (e) => {
       const data = JSON.parse(e.data);
 
-      // Chat
+      // ---- STATUS ----
+      if (data.type === "status") {
+        addStatus(data.message);
+
+        // When connected, decide caller
+        if (data.message === "Connected to stranger") {
+          isCaller = !pc; // first side becomes caller
+          if (isCaller) {
+            await startCall();
+          }
+        }
+      }
+
+      // ---- CHAT ----
       if (data.type === "chat") {
         addMessage("Stranger", data.message);
       }
 
-      // Status
-      if (data.type === "status") {
-        addStatus(data.message);
-      }
-
-      // WebRTC
+      // ---- WEBRTC ----
       if (data.type === "offer") {
         await createPeer();
         await pc.setRemoteDescription(data.offer);
@@ -69,22 +78,26 @@ document.addEventListener("DOMContentLoaded", () => {
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
     });
 
-    // Send ICE
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         socket.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
       }
     };
 
-    // Receive remote video
     pc.ontrack = (e) => {
       remoteVideo.srcObject = e.streams[0];
     };
 
-    // Add local tracks
     if (stream) {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
     }
+  }
+
+  async function startCall() {
+    await createPeer();
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.send(JSON.stringify({ type: "offer", offer }));
   }
 
   // ---------------- CAMERA ----------------
