@@ -1,93 +1,11 @@
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-
-  let stream = null;
-  let audioMuted = false;
-
-  // VIDEO
-  const localVideo = document.getElementById("localVideo");
-
-  // BUTTONS
-  const startBtn = document.getElementById("startCam");
-  const muteBtn = document.getElementById("mute");
-  const camOffBtn = document.getElementById("camOff");
-  const nextBtn = document.getElementById("next");
-
-  // CHAT
-  const chatInput = document.querySelector(".chat-input input");
-  const chatMessages = document.querySelector(".chat-messages");
-  const sendBtn = document.querySelector(".chat-input button");
-
-  // ---------------- CAMERA ----------------
-
-  startBtn.onclick = async () => {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      localVideo.srcObject = stream;
-    } catch (err) {
-      alert("Camera or mic permission denied");
-      console.error(err);
-    }
-  };
-
-  muteBtn.onclick = () => {
-    if (!stream) return;
-
-    stream.getAudioTracks().forEach(track => {
-      track.enabled = !track.enabled;
-      audioMuted = !track.enabled;
-    });
-
-    muteBtn.textContent = audioMuted ? "Unmute" : "Mute";
-  };
-
-  camOffBtn.onclick = () => {
-    if (!stream) return;
-
-    stream.getVideoTracks().forEach(track => {
-      track.enabled = !track.enabled;
-    });
-  };
-
-  nextBtn.onclick = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      stream = null;
-    }
-
-    localVideo.srcObject = null;
-    muteBtn.textContent = "Mute";
-    audioMuted = false;
-    chatMessages.innerHTML = "";
-  };
-
-  // ---------------- CHAT ----------------
-
-  function sendMessage() {
-    const msg = chatInput.value.trim();
-    if (!msg) return;
-
-    const div = document.createElement("div");
-    div.textContent = "You: " + msg;
-    div.style.padding = "6px";
-    div.style.fontSize = "13px";
-
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    chatInput.value = "";
-  }
-
-  sendBtn.onclick = sendMessage;
-
-  chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      sendMessage();
-    }
-  });
-
-});
-</script>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PopChat Test</title>
+</head>
+<body style="background:black;color:white;">
+  <h1>PopChat is loading</h1>
+</body>
+</html>
 
