@@ -1,115 +1,61 @@
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-
-  // -------- STATE --------
-  let stream = null;
-  let socket = null;
-
-  // -------- ELEMENTS --------
-  const localVideo = document.getElementById("localVideo");
-
-  const startBtn = document.getElementById("startCam");
-  const muteBtn = document.querySelector(".controls button:nth-of-type(2)");
-  const camOffBtn = document.querySelector(".controls button:nth-of-type(3)");
-  const nextBtn = document.querySelector(".controls button:nth-of-type(4)");
-
-  const chatInput = document.getElementById("chatInput");
-  const chatMessages = document.getElementById("chatMessages");
-  const sendBtn = document.getElementById("sendBtn");
-
-  muteBtn.disabled = false;
-  camOffBtn.disabled = false;
-  nextBtn.disabled = false;
-
-  // -------- WEBSOCKET --------
-  function connectSocket() {
-    socket = new WebSocket(
-      (location.protocol === "https:" ? "wss://" : "ws://") + location.host
-    );
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === "chat") {
-        addMessage("Stranger", data.message);
-      }
-
-      if (data.type === "status") {
-        addStatus(data.message);
-      }
-    };
-
-    socket.onclose = () => {
-      addStatus("Disconnected from server");
-    };
-  }
-
-  connectSocket();
-
-  // -------- CAMERA --------
-  startBtn.onclick = async () => {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localVideo.srcObject = stream;
-    } catch {
-      alert("Camera permission denied");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PopChat Test</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0b0b0b;
+      color: white;
+      font-family: Arial, sans-serif;
     }
-  };
-
-  muteBtn.onclick = () => {
-    if (!stream) return;
-    stream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
-  };
-
-  camOffBtn.onclick = () => {
-    if (!stream) return;
-    stream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
-  };
-
-  // -------- NEXT --------
-  nextBtn.onclick = () => {
-    if (socket && socket.readyState === 1) {
-      socket.send(JSON.stringify({ type: "next" }));
+    header {
+      padding: 16px;
+      text-align: center;
+      background: #111;
+      font-size: 20px;
     }
-    chatMessages.innerHTML = "";
-  };
+    .container {
+      display: flex;
+      height: calc(100vh - 60px);
+    }
+    .left, .right {
+      width: 20%;
+      padding: 10px;
+      border-right: 1px solid #222;
+    }
+    .center {
+      flex: 1;
+      padding: 10px;
+    }
+    .box {
+      width: 500px;
+      height: 400px;
+      background: #000;
+      border: 2px solid #333;
+      margin: 10px auto;
+    }
+  </style>
+</head>
+<body>
 
-  // -------- CHAT --------
-  function sendMessage() {
-    const msg = chatInput.value.trim();
-    if (!msg || !socket || socket.readyState !== 1) return;
+<header>🚀 PopChat UI Test</header>
 
-    addMessage("You", msg);
-    socket.send(JSON.stringify({ type: "chat", message: msg }));
-    chatInput.value = "";
-  }
+<div class="container">
+  <div class="left">Chat box</div>
 
-  sendBtn.onclick = sendMessage;
+  <div class="center">
+    <div class="box">Stranger Video</div>
+    <div class="box">Your Video</div>
+  </div>
 
-  chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") sendMessage();
-  });
+  <div class="right">
+    <button>Start Camera</button><br><br>
+    <button>Next</button>
+  </div>
+</div>
 
-  // -------- UI HELPERS --------
-  function addMessage(sender, text) {
-    const div = document.createElement("div");
-    div.textContent = sender + ": " + text;
-    div.style.padding = "6px";
-    div.style.fontSize = "13px";
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  function addStatus(text) {
-    const div = document.createElement("div");
-    div.textContent = "• " + text;
-    div.style.opacity = "0.7";
-    div.style.fontSize = "12px";
-    div.style.padding = "4px";
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-});
-</script>
+</body>
+</html>
 
