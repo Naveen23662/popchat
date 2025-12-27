@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// ✅ Serve frontend properly
+// Serve frontend
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
@@ -19,13 +19,14 @@ app.get("/", (req, res) => {
 });
 
 // --------------------
-// WebSocket pairing
+// WebSocket logic
 // --------------------
 let waitingUser = null;
 
 wss.on("connection", (ws) => {
   ws.partner = null;
 
+  // Pair users
   if (waitingUser) {
     ws.partner = waitingUser;
     waitingUser.partner = ws;
@@ -47,6 +48,7 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    // Text chat
     if (msg.type === "chat" && ws.partner) {
       ws.partner.send(JSON.stringify({
         type: "chat",
@@ -54,12 +56,20 @@ wss.on("connection", (ws) => {
       }));
     }
 
+    // WebRTC signaling (NEW)
+    if (
+      (msg.type === "offer" ||
+       msg.type === "answer" ||
+       msg.type === "ice") &&
+      ws.partner
+    ) {
+      ws.partner.send(JSON.stringify(msg));
+    }
+
+    // Next
     if (msg.type === "next") {
       if (ws.partner) {
-        ws.partner.send(JSON.stringify({
-          type: "status",
-          message: "Stranger disconnected"
-        }));
+        ws.partner.send(JSON.stringify({ type: "status", message: "Stranger disconnected" }));
         ws.partner.partner = null;
         waitingUser = ws.partner;
       }
@@ -71,10 +81,7 @@ wss.on("connection", (ws) => {
     if (ws === waitingUser) waitingUser = null;
 
     if (ws.partner) {
-      ws.partner.send(JSON.stringify({
-        type: "status",
-        message: "Stranger left"
-      }));
+      ws.partner.send(JSON.stringify({ type: "status", message: "Stranger left" }));
       ws.partner.partner = null;
       waitingUser = ws.partner;
     }
