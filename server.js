@@ -1,110 +1,52 @@
-const express = require("express");
-const http = require("http");
-const WebSocket = require("ws");
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+import { WebSocketServer } from "ws";
 
+// Fix __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// App setup
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const PORT = process.env.PORT || 8081;
 
-app.use(express.static("public"));
+// Serve static files (HTML, JS, CSS)
+app.use(express.static(__dirname));
 
-/* ---------------- CONFIG ---------------- */
-const FREE_SKIPS = 3;
-
-/* ---------------- STATE ---------------- */
-let males = [];
-let females = [];
-let others = [];
-let pairs = new Map();
-let skips = new Map();
-
-/* ---------------- HELPERS ---------------- */
-function enqueue(ws) {
-  const g = ws.gender;
-  if (g === "male") males.push(ws);
-  else if (g === "female") females.push(ws);
-  else others.push(ws);
-}
-
-function dequeue(ws) {
-  [males, females, others].forEach(q => {
-    const i = q.indexOf(ws);
-    if (i !== -1) q.splice(i, 1);
-  });
-}
-
-function matchUsers() {
-  while (males.length && females.length) {
-    connect(males.shift(), females.shift());
-  }
-  while (others.length >= 2) {
-    connect(others.shift(), others.shift());
-  }
-}
-
-function connect(a, b) {
-  pairs.set(a, b);
-  pairs.set(b, a);
-  a.send(JSON.stringify({ type: "match" }));
-  b.send(JSON.stringify({ type: "match" }));
-}
-
-function disconnect(ws) {
-  const peer = pairs.get(ws);
-  if (peer) {
-    peer.send(JSON.stringify({ type: "disconnect" }));
-    pairs.delete(peer);
-  }
-  pairs.delete(ws);
-  dequeue(ws);
-}
-
-/* ---------------- WS ---------------- */
-wss.on("connection", ws => {
-  ws.gender = "other";
-  skips.set(ws, FREE_SKIPS);
-
-  ws.on("message", msg => {
-    const data = JSON.parse(msg);
-
-    if (data.type === "setGender") {
-      ws.gender = data.gender;
-    }
-
-    if (data.type === "find") {
-      enqueue(ws);
-      matchUsers();
-    }
-
-    if (data.type === "next") {
-      const left = skips.get(ws) ?? 0;
-      if (left <= 0) {
-        ws.send(JSON.stringify({ type: "paywall" }));
-        return;
-      }
-      skips.set(ws, left - 1);
-      ws.send(JSON.stringify({ type: "skips", left: left - 1 }));
-      disconnect(ws);
-      enqueue(ws);
-      matchUsers();
-    }
-
-    if (data.type === "chat") {
-      const peer = pairs.get(ws);
-      if (peer) peer.send(JSON.stringify({ type: "chat", msg: data.msg }));
-    }
-
-    if (data.type === "signal") {
-      const peer = pairs.get(ws);
-      if (peer) peer.send(JSON.stringify(data));
-    }
-  });
-
-  ws.on("close", () => disconnect(ws));
+// Root route → serve index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-/* ---------------- START ---------------- */
-server.listen(8081, () => {
-  console.log("PopChat running on http://localhost:8081");
+// Health check (optional but good)
+app.get("/health", (req, res) => {
+  res.send("OK");
+});
+
+// Start HTTP server
+const server = app.listen(PORT, () => {
+  console.log(`✅ PopChat running on port ${PORT}`);
+});
+
+// WebSocket server
+const wss = new WebSocketServer({ server });
+
+// Simple WebSocket logic (safe default)
+wss.on("connection", (ws) => {
+  console.log("🔌 Client connected");
+
+  ws.on("message", (msg) => {
+    // Echo or signaling placeholder
+    wss.clients.forEach((client) => {
+      if (client !== ws && client.readyState === 1) {
+        client.send(msg);
+      }
+    });
+  });
+
+  ws.on("close", () => {
+    console.log("❌ Client disconnected");
+  });
 });
 
