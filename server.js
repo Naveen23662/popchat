@@ -11,18 +11,24 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+// --------------------
 // Serve static files
+// --------------------
 app.use(express.static(__dirname));
 
+// ✅ Explicit root route (IMPORTANT)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 // --------------------
-// WebSocket logic
+// WebSocket pairing
 // --------------------
 let waitingUser = null;
 
 wss.on("connection", (ws) => {
   ws.partner = null;
 
-  // Pair users
   if (waitingUser) {
     ws.partner = waitingUser;
     waitingUser.partner = ws;
@@ -44,7 +50,6 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    // Text chat
     if (msg.type === "chat" && ws.partner) {
       ws.partner.send(JSON.stringify({
         type: "chat",
@@ -52,7 +57,6 @@ wss.on("connection", (ws) => {
       }));
     }
 
-    // Next
     if (msg.type === "next") {
       if (ws.partner) {
         ws.partner.send(JSON.stringify({
@@ -67,9 +71,7 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    if (ws === waitingUser) {
-      waitingUser = null;
-    }
+    if (ws === waitingUser) waitingUser = null;
 
     if (ws.partner) {
       ws.partner.send(JSON.stringify({
@@ -83,7 +85,7 @@ wss.on("connection", (ws) => {
 });
 
 // --------------------
-// Catch-all (FIXED)
+// Catch-all fallback
 // --------------------
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
