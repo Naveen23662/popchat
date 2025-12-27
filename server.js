@@ -1,95 +1,28 @@
 import express from "express";
-import http from "http";
-import WebSocket, { WebSocketServer } from "ws";
 import path from "path";
 import { fileURLToPath } from "url";
 
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+// Fix __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-// Serve frontend
+// Serve static files
 app.use(express.static(path.join(__dirname, "public")));
 
+// Root route (VERY IMPORTANT)
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// --------------------
-// WebSocket logic
-// --------------------
-let waitingUser = null;
-
-wss.on("connection", (ws) => {
-  ws.partner = null;
-
-  // Pair users
-  if (waitingUser) {
-    ws.partner = waitingUser;
-    waitingUser.partner = ws;
-
-    ws.send(JSON.stringify({ type: "status", message: "Connected to stranger" }));
-    waitingUser.send(JSON.stringify({ type: "status", message: "Connected to stranger" }));
-
-    waitingUser = null;
-  } else {
-    waitingUser = ws;
-    ws.send(JSON.stringify({ type: "status", message: "Waiting for stranger..." }));
-  }
-
-  ws.on("message", (data) => {
-    let msg;
-    try {
-      msg = JSON.parse(data);
-    } catch {
-      return;
-    }
-
-    // Text chat
-    if (msg.type === "chat" && ws.partner) {
-      ws.partner.send(JSON.stringify({
-        type: "chat",
-        message: msg.message
-      }));
-    }
-
-    // WebRTC signaling (NEW)
-    if (
-      (msg.type === "offer" ||
-       msg.type === "answer" ||
-       msg.type === "ice") &&
-      ws.partner
-    ) {
-      ws.partner.send(JSON.stringify(msg));
-    }
-
-    // Next
-    if (msg.type === "next") {
-      if (ws.partner) {
-        ws.partner.send(JSON.stringify({ type: "status", message: "Stranger disconnected" }));
-        ws.partner.partner = null;
-        waitingUser = ws.partner;
-      }
-      ws.partner = null;
-    }
-  });
-
-  ws.on("close", () => {
-    if (ws === waitingUser) waitingUser = null;
-
-    if (ws.partner) {
-      ws.partner.send(JSON.stringify({ type: "status", message: "Stranger left" }));
-      ws.partner.partner = null;
-      waitingUser = ws.partner;
-    }
-  });
+// Health check
+app.get("/health", (req, res) => {
+  res.send("OK");
 });
 
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log("PopChat running on port", PORT);
+app.listen(PORT, () => {
+  console.log(`PopChat running on port ${PORT}`);
 });
 
