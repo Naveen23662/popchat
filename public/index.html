@@ -1,164 +1,27 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
-  // ---------------- STATE ----------------
-  let stream = null;
-  let socket = null;
-  let pc = null;
-  let isCaller = false;
-
-  // ---------------- ELEMENTS ----------------
-  const localVideo = document.getElementById("localVideo");
-  const remoteVideo = document.querySelector(".center video");
+  console.log("PopChat UI Loaded");
 
   const startBtn = document.getElementById("startCam");
   const muteBtn = document.getElementById("muteBtn");
   const camBtn = document.getElementById("camBtn");
   const nextBtn = document.getElementById("nextBtn");
-
-  const chatInput = document.getElementById("chatInput");
-  const chatMessages = document.getElementById("chatMessages");
   const sendBtn = document.getElementById("sendBtn");
 
-  // ---------------- SOCKET ----------------
-  function connectSocket() {
-    socket = new WebSocket(
-      (location.protocol === "https:" ? "wss://" : "ws://") + location.host
-    );
+  startBtn.onclick = () => alert("Camera start (Phase B)");
+  muteBtn.onclick = () => alert("Mute (Phase B)");
+  camBtn.onclick = () => alert("Cam off (Phase B)");
+  nextBtn.onclick = () => alert("Next (Phase B)");
 
-    socket.onmessage = async (e) => {
-      const data = JSON.parse(e.data);
-
-      // ---- STATUS ----
-      if (data.type === "status") {
-        addStatus(data.message);
-
-        // When connected, decide caller
-        if (data.message === "Connected to stranger") {
-          isCaller = !pc; // first side becomes caller
-          if (isCaller) {
-            await startCall();
-          }
-        }
-      }
-
-      // ---- CHAT ----
-      if (data.type === "chat") {
-        addMessage("Stranger", data.message);
-      }
-
-      // ---- WEBRTC ----
-      if (data.type === "offer") {
-        await createPeer();
-        await pc.setRemoteDescription(data.offer);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.send(JSON.stringify({ type: "answer", answer }));
-      }
-
-      if (data.type === "answer") {
-        await pc.setRemoteDescription(data.answer);
-      }
-
-      if (data.type === "ice" && pc) {
-        try {
-          await pc.addIceCandidate(data.candidate);
-        } catch {}
-      }
-    };
-  }
-
-  connectSocket();
-
-  // ---------------- PEER ----------------
-  async function createPeer() {
-    if (pc) return;
-
-    pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-    });
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        socket.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
-      }
-    };
-
-    pc.ontrack = (e) => {
-      remoteVideo.srcObject = e.streams[0];
-    };
-
-    if (stream) {
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-    }
-  }
-
-  async function startCall() {
-    await createPeer();
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.send(JSON.stringify({ type: "offer", offer }));
-  }
-
-  // ---------------- CAMERA ----------------
-  startBtn.onclick = async () => {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    localVideo.srcObject = stream;
-  };
-
-  muteBtn.onclick = () => {
-    if (!stream) return;
-    stream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
-  };
-
-  camBtn.onclick = () => {
-    if (!stream) return;
-    stream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
-  };
-
-  // ---------------- NEXT ----------------
-  nextBtn.onclick = () => {
-    if (pc) {
-      pc.close();
-      pc = null;
-    }
-    remoteVideo.srcObject = null;
-    chatMessages.innerHTML = "";
-    socket.send(JSON.stringify({ type: "next" }));
-  };
-
-  // ---------------- CHAT ----------------
-  function sendMessage() {
-    const msg = chatInput.value.trim();
-    if (!msg) return;
-    addMessage("You", msg);
-    socket.send(JSON.stringify({ type: "chat", message: msg }));
-    chatInput.value = "";
-  }
-
-  sendBtn.onclick = sendMessage;
-  chatInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-  });
-
-  function addMessage(sender, text) {
+  sendBtn.onclick = () => {
+    const input = document.getElementById("chatInput");
+    if (!input.value) return;
+    const box = document.getElementById("chatMessages");
     const div = document.createElement("div");
-    div.textContent = sender + ": " + text;
-    div.style.padding = "6px";
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  function addStatus(text) {
-    const div = document.createElement("div");
-    div.textContent = "• " + text;
-    div.style.opacity = "0.7";
-    div.style.fontSize = "12px";
-    div.style.padding = "4px";
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
+    div.textContent = "You: " + input.value;
+    box.appendChild(div);
+    input.value = "";
+  };
 });
 </script>
 
