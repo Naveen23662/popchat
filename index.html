@@ -1,95 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PopChat</title>
+  <meta charset="UTF-8" />
+  <title>PopChat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<style>
-body,html{margin:0;height:100%;background:#0b0b0b;color:#fff;font-family:sans-serif}
-.app{height:100vh;display:flex;flex-direction:column}
-header{text-align:center;padding:8px;background:#000}
-.videos{flex:1;display:flex;gap:6px;padding:6px}
-.video{flex:1;background:#000;border-radius:8px;overflow:hidden}
-video{width:100%;height:100%;object-fit:cover}
-.controls{text-align:center}
-button{padding:8px 14px;border-radius:6px;border:none;margin:4px}
-.chat{height:160px;background:#151515;display:flex;flex-direction:column}
-.messages{flex:1;overflow:auto;padding:6px;font-size:13px}
-.input{display:flex}
-input{flex:1;padding:10px}
-@media(max-width:768px){.videos{flex-direction:column}}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center}
-.modal div{background:#111;padding:20px;border-radius:8px}
-</style>
+  <style>
+    body {
+      margin: 0;
+      background: #0b0b0b;
+      color: white;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      text-align: center;
+      padding: 12px;
+      font-weight: bold;
+    }
+
+    .videos {
+      flex: 1;
+      display: flex;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    video {
+      flex: 1;
+      background: black;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px;
+      background: #111;
+    }
+
+    button {
+      padding: 10px 18px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
 </head>
 
 <body>
-<div class="app">
+
 <header>🚀 PopChat</header>
 
 <div class="videos">
-  <div class="video"><video id="local" autoplay muted></video></div>
-  <div class="video"><video id="remote" autoplay></video></div>
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
 </div>
 
 <div class="controls">
-  <button onclick="find()">Pop Now</button>
-  <button onclick="next()">Next</button>
-  <div id="status">Idle</div>
-  <div id="skips"></div>
-</div>
-
-<div class="chat">
-  <div id="msgs" class="messages"></div>
-  <div class="input">
-    <input id="msg" placeholder="Type…" />
-    <button onclick="send()">Send</button>
-  </div>
-</div>
-</div>
-
-<div class="modal" id="pay">
-  <div>
-    <h3>No free skips left</h3>
-    <p>Upgrade coming soon</p>
-    <button onclick="closePay()">OK</button>
-  </div>
+  <button id="popNow">Pop Now</button>
+  <button id="next">Next</button>
 </div>
 
 <script>
-const ws=new WebSocket(`ws://${location.host}`);
-let pc,stream;
+  const popBtn = document.getElementById("popNow");
+  const nextBtn = document.getElementById("next");
+  const localVideo = document.getElementById("localVideo");
 
-navigator.mediaDevices.getUserMedia({video:true,audio:true}).then(s=>{
-  stream=s;local.srcObject=s;
-});
+  let localStream = null;
 
-msg.addEventListener("keydown",e=>{
-  if(e.key==="Enter")send();
-});
+  async function startCamera() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      localVideo.srcObject = localStream;
+      console.log("Camera started");
+    } catch (err) {
+      alert("Camera permission denied or unavailable");
+      console.error(err);
+    }
+  }
 
-function send(){
-  if(!msg.value)return;
-  ws.send(JSON.stringify({type:"chat",msg:msg.value}));
-  msgs.innerHTML+=`<div>You: ${msg.value}</div>`;
-  msg.value="";
-}
+  function stopCamera() {
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = null;
+      localVideo.srcObject = null;
+      console.log("Camera stopped");
+    }
+  }
 
-function find(){ws.send(JSON.stringify({type:"find"}));}
-function next(){ws.send(JSON.stringify({type:"next"}));}
+  popBtn.onclick = () => {
+    startCamera();
+  };
 
-function closePay(){pay.style.display="none";}
-
-ws.onmessage=e=>{
-  const d=JSON.parse(e.data);
-
-  if(d.type==="match"){status.innerText="Connected";}
-  if(d.type==="disconnect"){remote.srcObject=null;}
-  if(d.type==="chat"){msgs.innerHTML+=`<div>Stranger: ${d.msg}</div>`;}
-  if(d.type==="skips"){skips.innerText=`Free skips left: ${d.left}`;}
-  if(d.type==="paywall"){pay.style.display="flex";}
-};
+  nextBtn.onclick = () => {
+    stopCamera();
+    startCamera();
+  };
 </script>
+
 </body>
 </html>
 
