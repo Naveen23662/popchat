@@ -1,22 +1,259 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>PopChat</title>
-  <style>
-    body {
-      margin: 0;
-      background: #0b0b0b;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: Arial;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>PopChat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<style>
+body {
+  margin: 0;
+  background: #0b0b0b;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+header {
+  height: 50px;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #222;
+  font-weight: bold;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 300px 1fr 220px;
+  height: calc(100vh - 50px);
+}
+
+/* LEFT CHAT */
+.chat {
+  border-right: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat h3 {
+  margin: 10px;
+  font-size: 14px;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 10px;
+  font-size: 13px;
+  overflow-y: auto;
+}
+
+.chat-input {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 6px;
+}
+
+.chat-input button {
+  padding: 6px 10px;
+}
+
+/* CENTER VIDEOS */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding-top: 20px;
+}
+
+.video-box {
+  width: 500px;
+}
+
+.video-label {
+  color: #f5c542;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+video {
+  width: 500px;
+  height: 400px;
+  background: black;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+/* RIGHT CONTROLS */
+.controls {
+  border-left: 1px solid #222;
+  padding: 10px;
+}
+
+.controls h3 {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.controls button {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+</style>
 </head>
+
 <body>
-  <h1>🚀 PopChat UI Loaded</h1>
+
+<header>🚀 PopChat</header>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="chat">
+    <h3>Chat box</h3>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="Type a message..." />
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center">
+    <div class="video-box">
+      <div class="video-label">Stranger</div>
+      <video autoplay playsinline></video>
+    </div>
+
+    <div class="video-box">
+      <div class="video-label">You</div>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="controls">
+    <h3>Additional features</h3>
+    <button id="startCam">Start Camera</button>
+    <button id="muteBtn">Mute</button>
+    <button id="camBtn">Cam Off</button>
+    <button id="nextBtn">Next</button>
+  </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  let stream = null;
+  let socket = null;
+
+  const localVideo = document.getElementById("localVideo");
+
+  const startBtn = document.getElementById("startCam");
+  const muteBtn = document.getElementById("muteBtn");
+  const camBtn = document.getElementById("camBtn");
+  const nextBtn = document.getElementById("nextBtn");
+
+  const chatInput = document.getElementById("chatInput");
+  const chatMessages = document.getElementById("chatMessages");
+  const sendBtn = document.getElementById("sendBtn");
+
+  // ---- WebSocket ----
+  function connectSocket() {
+    socket = new WebSocket(
+      (location.protocol === "https:" ? "wss://" : "ws://") + location.host
+    );
+
+    socket.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+
+      if (data.type === "chat") {
+        addMessage("Stranger", data.message);
+      }
+
+      if (data.type === "status") {
+        addStatus(data.message);
+      }
+    };
+  }
+
+  connectSocket();
+
+  // ---- Camera ----
+  startBtn.onclick = async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localVideo.srcObject = stream;
+    } catch {
+      alert("Camera permission denied");
+    }
+  };
+
+  muteBtn.onclick = () => {
+    if (!stream) return;
+    stream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+  };
+
+  camBtn.onclick = () => {
+    if (!stream) return;
+    stream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
+  };
+
+  // ---- Next ----
+  nextBtn.onclick = () => {
+    if (socket && socket.readyState === 1) {
+      socket.send(JSON.stringify({ type: "next" }));
+    }
+    chatMessages.innerHTML = "";
+  };
+
+  // ---- Chat ----
+  function sendMessage() {
+    const msg = chatInput.value.trim();
+    if (!msg || !socket || socket.readyState !== 1) return;
+
+    addMessage("You", msg);
+    socket.send(JSON.stringify({ type: "chat", message: msg }));
+    chatInput.value = "";
+  }
+
+  sendBtn.onclick = sendMessage;
+  chatInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendMessage();
+  });
+
+  function addMessage(sender, text) {
+    const div = document.createElement("div");
+    div.textContent = sender + ": " + text;
+    div.style.padding = "6px";
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addStatus(text) {
+    const div = document.createElement("div");
+    div.textContent = "• " + text;
+    div.style.opacity = "0.7";
+    div.style.fontSize = "12px";
+    div.style.padding = "4px";
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+});
+</script>
+
 </body>
 </html>
 
