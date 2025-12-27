@@ -11,14 +11,11 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// --------------------
-// Serve static files
-// --------------------
-app.use(express.static(__dirname));
+// ✅ Serve frontend properly
+app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Explicit root route (IMPORTANT)
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // --------------------
@@ -84,14 +81,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// --------------------
-// Catch-all fallback
-// --------------------
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
-
-// --------------------
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log("PopChat running on port", PORT);
