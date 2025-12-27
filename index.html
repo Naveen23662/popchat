@@ -1,195 +1,107 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>PopChat</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<style>
-body {
-  margin: 0;
-  background: #0b0b0b;
-  color: #fff;
-  font-family: Arial, sans-serif;
-  height: 100vh;
-  overflow: hidden;
-}
-
-header {
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-  border-bottom: 1px solid #222;
-  font-weight: bold;
-}
-
-.main {
-  display: grid;
-  grid-template-columns: 300px 1fr 220px;
-  height: calc(100vh - 50px);
-}
-
-/* LEFT CHAT */
-.chat {
-  border-right: 1px solid #222;
-  display: flex;
-  flex-direction: column;
-}
-
-.chat h3 {
-  margin: 10px;
-  font-size: 14px;
-}
-
-.chat-messages {
-  flex: 1;
-  padding: 10px;
-  font-size: 13px;
-  overflow-y: auto;
-}
-
-.chat-input {
-  display: flex;
-  gap: 6px;
-  padding: 10px;
-}
-
-.chat-input input {
-  flex: 1;
-  padding: 6px;
-}
-
-.chat-input button {
-  padding: 6px 10px;
-}
-
-/* CENTER VIDEOS */
-.center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding-top: 20px;
-}
-
-.video-box {
-  width: 500px;
-}
-
-.video-label {
-  color: #f5c542;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-video {
-  width: 500px;
-  height: 400px;
-  background: black;
-  border-radius: 10px;
-  object-fit: cover;
-}
-
-/* RIGHT CONTROLS */
-.controls {
-  border-left: 1px solid #222;
-  padding: 10px;
-}
-
-.controls h3 {
-  font-size: 14px;
-  margin-bottom: 10px;
-}
-
-.controls button {
-  width: 100%;
-  padding: 8px;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-</style>
-</head>
-
-<body>
-
-<header>🚀 PopChat</header>
-
-<div class="main">
-
-  <!-- LEFT -->
-  <div class="chat">
-    <h3>Chat box</h3>
-    <div class="chat-messages" id="chatMessages"></div>
-    <div class="chat-input">
-      <input id="chatInput" placeholder="Type a message..." />
-      <button id="sendBtn">Send</button>
-    </div>
-  </div>
-
-  <!-- CENTER -->
-  <div class="center">
-    <div class="video-box">
-      <div class="video-label">Stranger</div>
-      <video autoplay playsinline></video>
-    </div>
-
-    <div class="video-box">
-      <div class="video-label">You</div>
-      <video id="localVideo" autoplay muted playsinline></video>
-    </div>
-  </div>
-
-  <!-- RIGHT -->
-  <div class="controls">
-    <h3>Additional features</h3>
-    <button id="startCam">Start Camera</button>
-    <button disabled>Mute</button>
-    <button disabled>Cam Off</button>
-    <button disabled>Next</button>
-  </div>
-
-</div>
-
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
   let stream = null;
+  let audioMuted = false;
+  let videoOff = false;
 
+  // VIDEO
   const localVideo = document.getElementById("localVideo");
-  const startCam = document.getElementById("startCam");
-  const sendBtn = document.getElementById("sendBtn");
+
+  // BUTTONS
+  const startBtn = document.getElementById("startCam");
+  const muteBtn = document.querySelector(".controls button:nth-of-type(2)");
+  const camOffBtn = document.querySelector(".controls button:nth-of-type(3)");
+  const nextBtn = document.querySelector(".controls button:nth-of-type(4)");
+
+  // CHAT
   const chatInput = document.getElementById("chatInput");
   const chatMessages = document.getElementById("chatMessages");
+  const sendBtn = document.getElementById("sendBtn");
 
-  startCam.onclick = async () => {
+  // Enable buttons safely
+  muteBtn.disabled = false;
+  camOffBtn.disabled = false;
+  nextBtn.disabled = false;
+
+  // -------- CAMERA --------
+  startBtn.onclick = async () => {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
       localVideo.srcObject = stream;
-    } catch {
-      alert("Camera permission denied");
+      audioMuted = false;
+      videoOff = false;
+      muteBtn.textContent = "Mute";
+      camOffBtn.textContent = "Cam Off";
+    } catch (e) {
+      alert("Camera or mic permission denied");
     }
   };
 
-  sendBtn.onclick = () => {
+  // -------- MUTE --------
+  muteBtn.onclick = () => {
+    if (!stream) return;
+
+    stream.getAudioTracks().forEach(track => {
+      track.enabled = !track.enabled;
+      audioMuted = !track.enabled;
+    });
+
+    muteBtn.textContent = audioMuted ? "Unmute" : "Mute";
+  };
+
+  // -------- CAM OFF --------
+  camOffBtn.onclick = () => {
+    if (!stream) return;
+
+    stream.getVideoTracks().forEach(track => {
+      track.enabled = !track.enabled;
+      videoOff = !track.enabled;
+    });
+
+    camOffBtn.textContent = videoOff ? "Cam On" : "Cam Off";
+  };
+
+  // -------- NEXT --------
+  nextBtn.onclick = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    localVideo.srcObject = null;
+    chatMessages.innerHTML = "";
+    audioMuted = false;
+    videoOff = false;
+
+    muteBtn.textContent = "Mute";
+    camOffBtn.textContent = "Cam Off";
+  };
+
+  // -------- CHAT --------
+  function sendMessage() {
     const msg = chatInput.value.trim();
     if (!msg) return;
 
     const div = document.createElement("div");
     div.textContent = "You: " + msg;
+    div.style.padding = "6px";
+    div.style.fontSize = "13px";
+
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     chatInput.value = "";
-  };
+  }
 
-  chatInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendBtn.click();
+  sendBtn.onclick = sendMessage;
+
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
   });
 
 });
 </script>
-
-</body>
-</html>
 
